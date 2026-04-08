@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.js": "/invoice-app-okan/static/js/main.4b22748d.js",
-    "index.html": "/invoice-app-okan/index.html",
-    "main.4b22748d.js.map": "/invoice-app-okan/static/js/main.4b22748d.js.map"
+    "main.js": "/static/js/main.c08817a9.js",
+    "index.html": "/index.html",
+    "main.c08817a9.js.map": "/static/js/main.c08817a9.js.map"
   },
   "entrypoints": [
-    "static/js/main.4b22748d.js"
+    "static/js/main.c08817a9.js"
   ]
 }
