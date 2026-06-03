@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Game Jam — Local Preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "/Users/salah/Desktop/game-jam", "-p", "3000", "--no-clipboard"],
+      "port": 3000
+    }
+  ]
+}
