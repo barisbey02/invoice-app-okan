@@ -23,9 +23,10 @@ export default function App() {
     date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })(),
     acYear: "2025-2026",
     invAmount: "", totalAmount: "",
-    invNo: "", customDept: "",
+    invNo: "", customDept: "", customDesc: "",
   });
   const [selectedDept, setSelectedDept] = useState("");
+  const [descType, setDescType] = useState("registration");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -67,6 +68,8 @@ export default function App() {
           totalAmount: form.totalAmount || null,
           program,
           invNo: form.invNo || null,
+          descType,
+          customDesc: form.customDesc || null,
         }),
       });
       if (!res.ok) {
@@ -152,6 +155,36 @@ export default function App() {
               )}
             </div>
           )}
+        </div>
+
+        {/* Description type */}
+        <div style={s.card}>
+          <div style={s.cardHeader}>
+            <span style={s.cardIcon}>📄</span>
+            <span style={s.cardTitle}>Invoice Description</span>
+          </div>
+          <div style={s.deptGrid}>
+            {[
+              { key: "registration", label: "Registration fee" },
+              { key: "debt", label: "Debt payment" },
+              { key: "dorm", label: "Dormitory fee" },
+            ].map((d) => (
+              <button
+                key={d.key}
+                style={{ ...s.deptBtn, ...(descType === d.key && !form.customDesc ? s.deptBtnActive : {}) }}
+                onClick={() => { setDescType(d.key); setForm(f => ({ ...f, customDesc: "" })); }}
+              >
+                <div style={{ ...s.deptName, ...(descType === d.key && !form.customDesc ? { color: "#fff" } : {}) }}>{d.label}</div>
+              </button>
+            ))}
+          </div>
+          <Field
+            label="Custom Description"
+            value={form.customDesc}
+            onChange={set("customDesc")}
+            placeholder="e.g. 2025-2026 exchange program fee..."
+            optional
+          />
         </div>
 
         {/* Program */}

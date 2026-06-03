@@ -20,13 +20,24 @@ function sp(n) {
   return new Paragraph({ children: [new TextRun("")], spacing: { after: n } });
 }
 
-function buildDoc({ firstName, lastName, date, acYear, invAmount, totalAmount, program, invNo }) {
+function buildDoc({ firstName, lastName, date, acYear, invAmount, totalAmount, program, invNo, descType, customDesc }) {
   const fullName = `${firstName} ${lastName}`;
   const acYearStr = acYear || "2024-2025";
   const d = new Date(date);
   const dateStr = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
   const invAmt = fmtAmt(invAmount);
   const totAmt = totalAmount ? fmtAmt(totalAmount) : null;
+
+  let descText;
+  if (customDesc && customDesc.trim()) {
+    descText = customDesc.trim();
+  } else if (descType === "debt") {
+    descText = `${program} program at İstanbul Okan University ${acYearStr} tuition debt payment`;
+  } else if (descType === "dorm") {
+    descText = `${program} program at İstanbul Okan University ${acYearStr} dormitory fee`;
+  } else {
+    descText = `${program} program at İstanbul Okan University ${acYearStr} registration fee`;
+  }
 
   const thin = { style: BorderStyle.SINGLE, size: 4, color: "CCCCCC" };
   const none = { style: BorderStyle.NIL, size: 0, color: "FFFFFF" };
@@ -75,12 +86,12 @@ function buildDoc({ firstName, lastName, date, acYear, invAmount, totalAmount, p
         new TableCell({ borders: cb, width: { size: 2160, type: WidthType.DXA }, shading: { fill: "1F3864", type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "AMOUNT", bold: true, size: 20, color: "FFFFFF" })] })] }),
       ]}),
       new TableRow({ children: [
-        new TableCell({ borders: cb, width: { size: 7200, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: `${program} program at İstanbul Okan University ${acYearStr} registration fee`, size: 20 })] })] }),
+        new TableCell({ borders: cb, width: { size: 7200, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: descText, size: 20 })] })] }),
         new TableCell({ borders: cb, width: { size: 2160, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${invAmt} USD`, size: 20 })] })] }),
       ]}),
       new TableRow({ children: [
         new TableCell({ borders: cb, width: { size: 7200, type: WidthType.DXA }, shading: { fill: "F2F2F2", type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: "TOTAL", bold: true, size: 20 })] })] }),
-        new TableCell({ borders: cb, width: { size: 2160, type: WidthType.DXA }, shading: { fill: "F2F2F2", type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${invAmt} USD`, bold: true, size: 20 })] })] }),
+        new TableCell({ borders: cb, width: { size: 2160, type: WidthType.DXA }, shading: { fill: "F2F2F2", type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${totAmt || invAmt} USD`, bold: true, size: 20 })] })] }),
       ]}),
     ]
   });
@@ -117,13 +128,13 @@ function buildDoc({ firstName, lastName, date, acYear, invAmount, totalAmount, p
   return new Document({
     sections: [{
       properties: {
-        page: { size: { width: 12240, height: 15840 }, margin: { top: 1080, right: 1080, bottom: 1080, left: 1080 } }
+        page: { size: { width: 12240, height: 15840 }, margin: { top: 1800, right: 1080, bottom: 1080, left: 1080 } }
       },
       children: [
         headerTable, sp(240), invoiceTable, sp(240),
         ...paymentLines, sp(200),
         new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: "BANK INFORMATION:", bold: true, size: 20 })] }),
-        bankTable, sp(400),
+        bankTable, sp(3200),
         new Paragraph({ children: [new TextRun({ text: "Elif Tuğçe Dağ", bold: true, size: 20 })] }),
         new Paragraph({ children: [new TextRun({ text: "Student Operations Specialist", size: 18 })] }),
       ]
@@ -136,6 +147,7 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 app.post("/generate", async (req, res) => {
   try {
     const data = req.body;
+    data.descType = data.descType || "registration";
     if (!data.firstName || !data.lastName || !data.invAmount || !data.program) {
       return res.status(400).json({ error: "Missing required fields" });
     }
