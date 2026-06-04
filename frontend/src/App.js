@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3001";
+const LOCAL_API = "http://localhost:3001";
 
 const DEPTS = [
   { name: "Medicine", typical: 19475 },
@@ -31,6 +32,10 @@ export default function App() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [showContact, setShowContact] = useState(false);
+  const [studentNo, setStudentNo] = useState("");
+  const [studentLookupLoading, setStudentLookupLoading] = useState(false);
+  const [studentLookupError, setStudentLookupError] = useState("");
+  const [showLookup, setShowLookup] = useState(false);
 
   const set = (k) => (e) => {
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -39,6 +44,35 @@ export default function App() {
   };
 
   const program = form.customDept.trim() || selectedDept;
+
+  const handleStudentLookup = async () => {
+    if (!studentNo.trim()) return;
+    setStudentLookupLoading(true);
+    setStudentLookupError("");
+    try {
+      const res = await fetch(`${LOCAL_API}/student/${studentNo.trim()}`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Student not found");
+      }
+      const data = await res.json();
+      const nameParts = data.fullName.trim().split(" ");
+      const lastName = nameParts.pop();
+      const firstName = nameParts.join(" ");
+      setForm(f => ({
+        ...f,
+        firstName,
+        lastName,
+        customDept: data.program || "",
+        totalAmount: data.tuition ? String(data.tuition) : f.totalAmount,
+      }));
+      setSelectedDept("");
+    } catch (e) {
+      setStudentLookupError(e.message);
+    } finally {
+      setStudentLookupLoading(false);
+    }
+  };
 
   const handleDeptClick = (name) => {
     setSelectedDept(name);
@@ -113,6 +147,49 @@ export default function App() {
           <h1 style={s.title}>Invoice Generator</h1>
           <p style={s.subtitle}>Generate proforma invoices for student tuition fees</p>
         </div>
+
+        {/* Student Lookup Toggle */}
+        <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            onClick={() => setShowLookup(v => !v)}
+            style={{ ...s.genBtn, width: "auto", padding: "7px 16px", fontSize: 13, boxShadow: "none", borderRadius: 8, background: showLookup ? "#1e1b4b" : "#f3f4f6", color: showLookup ? "#fff" : "#6b7280" }}
+          >
+            {showLookup ? "✕ Hide student lookup" : "🔍 Use student lookup"}
+          </button>
+          {showLookup && <span style={{ fontSize: 12, color: "#9ca3af" }}>Requires local backend running at the office</span>}
+        </div>
+
+        {/* Student Lookup */}
+        {showLookup && (
+        <div style={s.card}>
+          <div style={s.cardHeader}>
+            <span style={s.cardIcon}>🔍</span>
+            <span style={s.cardTitle}>Student Lookup</span>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              <input
+                type="text"
+                value={studentNo}
+                onChange={e => setStudentNo(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleStudentLookup()}
+                placeholder="Enter student number..."
+                style={s.input}
+                onFocus={e => { e.target.style.borderColor = "#6366f1"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"; }}
+                onBlur={e => { e.target.style.borderColor = "#e5e7eb"; e.target.style.boxShadow = "none"; }}
+              />
+            </div>
+            <button
+              onClick={handleStudentLookup}
+              disabled={studentLookupLoading}
+              style={{ ...s.genBtn, width: "auto", padding: "9px 20px", fontSize: 13, boxShadow: "none", borderRadius: 9, opacity: studentLookupLoading ? 0.6 : 1 }}
+            >
+              {studentLookupLoading ? "..." : "Fill"}
+            </button>
+          </div>
+          {studentLookupError && <div style={{ ...s.errorBox, marginTop: 8, marginBottom: 0 }}><span style={s.alertIcon}>⚠</span> {studentLookupError}</div>}
+        </div>
+        )}
 
         {/* Student Info */}
         <div style={s.card}>
