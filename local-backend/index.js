@@ -67,6 +67,32 @@ app.get("/student/:id", async (req, res) => {
   }
 });
 
+// ── Debug: check user KisiID and TEMP table row count ─────────────────────
+app.get("/debug", async (req, res) => {
+  try {
+    const db = await getPool();
+
+    // Get all users
+    const users = await db.request().query(`SELECT LoginName, KisiID FROM FORNET_Kullanici`);
+
+    // For each user, check if their TEMP table has rows
+    const results = [];
+    for (const u of users.recordset) {
+      try {
+        const count = await db.request().query(
+          `SELECT COUNT(*) as cnt FROM TEMP_OgrenciKayitListesi_${u.KisiID}`
+        );
+        results.push({ login: u.LoginName, kisiID: u.KisiID, rows: count.recordset[0].cnt });
+      } catch (e) {
+        results.push({ login: u.LoginName, kisiID: u.KisiID, rows: "table missing" });
+      }
+    }
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Schema discovery (use once to find correct table/column names) ──────────
 app.get("/schema", async (req, res) => {
   try {
