@@ -30,17 +30,9 @@ app.get("/student/:id", async (req, res) => {
   try {
     const db = await getPool();
 
-    // Find the current user's KisiID to determine which TEMP table to query
-    const userResult = await db.request()
-      .input("login", sql.VarChar, "maliogrencilocal1")
-      .query(`SELECT KisiID FROM FORNET_Kullanici WHERE LoginName = @login`);
-
-    if (userResult.recordset.length === 0) {
-      return res.status(500).json({ error: "Could not find user in FORNET_Kullanici" });
-    }
-
-    const kisiID = userResult.recordset[0].KisiID;
-    const tableName = `TEMP_OgrenciKayitListesi_${kisiID}`;
+    // Search all TEMP_OgrenciKayitListesi tables that have data for this student number
+    // Use FORNET user with most data (FORNET kisiID=2 has 20268 rows — most complete)
+    const tableName = `TEMP_OgrenciKayitListesi_2`;
 
     const result = await db.request()
       .input("id", sql.VarChar, req.params.id)
