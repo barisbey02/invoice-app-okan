@@ -29,14 +29,38 @@ async function getPool() {
 app.get("/student/:id", async (req, res) => {
   try {
     const db = await getPool();
+
+    // Find the current user's KisiID to determine which TEMP table to query
+    const userResult = await db.request()
+      .input("login", sql.VarChar, "maliogrencilocal1")
+      .query(`SELECT KisiID FROM FORNET_Kullanici WHERE LoginName = @login`);
+
+    if (userResult.recordset.length === 0) {
+      return res.status(500).json({ error: "Could not find user in FORNET_Kullanici" });
+    }
+
+    const kisiID = userResult.recordset[0].KisiID;
+    const tableName = `TEMP_OgrenciKayitListesi_${kisiID}`;
+
     const result = await db.request()
       .input("id", sql.VarChar, req.params.id)
-      .query(`SELECT * FROM Ogrenci WHERE OgrenciNo = @id`);
+      .query(`SELECT TOP 1 HesapKodu, Unvan1, Bolum, Fakulte, EgitimYil, EgitimUcreti
+              FROM ${tableName}
+              WHERE HesapKodu = @id`);
 
     if (result.recordset.length === 0) {
       return res.status(404).json({ error: "Student not found" });
     }
-    res.json(result.recordset[0]);
+
+    const row = result.recordset[0];
+    res.json({
+      studentNo: row.HesapKodu,
+      fullName: row.Unvan1,
+      program: row.Bolum,
+      faculty: row.Fakulte,
+      acYear: row.EgitimYil,
+      tuition: row.EgitimUcreti,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
