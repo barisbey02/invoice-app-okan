@@ -25,6 +25,76 @@ async function getPool() {
   return pool;
 }
 
+// ── Admin password ─────────────────────────────────────────────────────────
+// TODO: Change this to your actual admin password before using
+const ADMIN_PASS = "MySecretPassword123";
+
+// ── Admin: lookup student (returns full raw row) ───────────────────────────
+app.post("/admin-lookup", async (req, res) => {
+  const { password, studentNo } = req.body;
+  if (!password || password !== ADMIN_PASS) {
+    return res.status(401).json({ error: "Unauthorized: wrong password" });
+  }
+  if (!studentNo) {
+    return res.status(400).json({ error: "studentNo is required" });
+  }
+  try {
+    const db = await getPool();
+    const result = await db.request()
+      .input("id", sql.VarChar, String(studentNo).trim())
+      .query(`SELECT TOP 1 HesapKodu, Unvan1, Bolum, Fakulte, EgitimYil, EgitimUcreti
+              FROM TEMP_OgrenciKayitListesi_2
+              WHERE HesapKodu = @id`);
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+    res.json(result.recordset[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Admin: update all editable fields for a student ────────────────────────
+app.post("/admin-update-all", async (req, res) => {
+  const { password, studentNo, Unvan1, Bolum, Fakulte, EgitimYil, EgitimUcreti } = req.body;
+
+  if (!password || password !== ADMIN_PASS) {
+    return res.status(401).json({ error: "Unauthorized: wrong password" });
+  }
+  if (!studentNo) {
+    return res.status(400).json({ error: "studentNo is required" });
+  }
+
+  try {
+    const db = await getPool();
+    const result = await db.request()
+      // WHERE key — identifies the row, never updated
+      .input("studentNo",    sql.VarChar(50),      String(studentNo).trim())
+      // Fields being updated — all parameterized, no string concatenation
+      .input("Unvan1",       sql.NVarChar(255),    Unvan1       ?? null)
+      .input("Bolum",        sql.NVarChar(255),    Bolum        ?? null)
+      .input("Fakulte",      sql.NVarChar(255),    Fakulte      ?? null)
+      .input("EgitimYil",    sql.NVarChar(50),     EgitimYil    ?? null)
+      .input("EgitimUcreti", sql.Decimal(18, 2),   EgitimUcreti != null ? parseFloat(EgitimUcreti) : null)
+      .query(`
+        UPDATE TEMP_OgrenciKayitListesi_2
+        SET
+          Unvan1       = @Unvan1,
+          Bolum        = @Bolum,
+          Fakulte      = @Fakulte,
+          EgitimYil    = @EgitimYil,
+          EgitimUcreti = @EgitimUcreti
+        WHERE HesapKodu = @studentNo
+      `);
+
+    res.json({ ok: true, rowsAffected: result.rowsAffected[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Student lookup ─────────────────────────────────────────────────────────
 app.get("/student/:id", async (req, res) => {
   try {

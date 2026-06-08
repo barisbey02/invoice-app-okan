@@ -1,5 +1,185 @@
 import { useState } from "react";
 
+// ─── Staff Admin Dashboard ────────────────────────────────────────────────────
+function AdminDashboard() {
+  const [step, setStep] = useState("lookup"); // "lookup" | "edit"
+  const [password, setPassword] = useState("");
+  const [studentNo, setStudentNo] = useState("");
+  const [record, setRecord] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  // Step 1: verify password + fetch student record
+  const handleLookup = async (e) => {
+    e.preventDefault();
+    setLoading(true); setError(""); setSuccess("");
+    try {
+      const res = await fetch("http://localhost:3001/admin-lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, studentNo: studentNo.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Lookup failed");
+      setRecord(data);
+      setEditForm({
+        Unvan1:       data.Unvan1       || "",
+        Bolum:        data.Bolum        || "",
+        Fakulte:      data.Fakulte      || "",
+        EgitimYil:    data.EgitimYil    || "",
+        EgitimUcreti: data.EgitimUcreti != null ? String(data.EgitimUcreti) : "",
+      });
+      setStep("edit");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 2: save all updated fields
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setLoading(true); setError(""); setSuccess("");
+    try {
+      const res = await fetch("http://localhost:3001/admin-update-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password,
+          studentNo: record.HesapKodu,
+          ...editForm,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Update failed");
+      setSuccess(`Saved. ${data.rowsAffected} row(s) updated.`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const setField = (k) => (e) => {
+    setEditForm(f => ({ ...f, [k]: e.target.value }));
+    setSuccess(""); setError("");
+  };
+
+  // ── Shared sub-styles ──
+  const inputStyle = { ...s.input, marginBottom: 0 };
+  const disabledInput = { ...inputStyle, background: "#f3f4f6", color: "#9ca3af", cursor: "not-allowed" };
+
+  return (
+    <div style={s.card}>
+      <div style={s.cardHeader}>
+        <span style={s.cardIcon}>🔐</span>
+        <span style={s.cardTitle}>Staff Admin — Edit Student Record</span>
+      </div>
+
+      {step === "lookup" && (
+        <form onSubmit={handleLookup}>
+          <div style={s.field}>
+            <label style={s.label}>Admin Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError(""); }}
+              placeholder="Enter admin password"
+              style={inputStyle}
+              required
+              onFocus={e => { e.target.style.borderColor = "#6366f1"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"; }}
+              onBlur={e => { e.target.style.borderColor = "#e5e7eb"; e.target.style.boxShadow = "none"; }}
+            />
+          </div>
+          <div style={{ ...s.field, marginTop: 10 }}>
+            <label style={s.label}>Student Number</label>
+            <input
+              type="text"
+              value={studentNo}
+              onChange={e => { setStudentNo(e.target.value); setError(""); }}
+              placeholder="e.g. 220218371"
+              style={inputStyle}
+              required
+              onFocus={e => { e.target.style.borderColor = "#6366f1"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"; }}
+              onBlur={e => { e.target.style.borderColor = "#e5e7eb"; e.target.style.boxShadow = "none"; }}
+            />
+          </div>
+          {error && <div style={{ ...s.errorBox, marginTop: 10 }}><span style={s.alertIcon}>⚠</span> {error}</div>}
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ ...s.genBtn, marginTop: 14, opacity: loading ? 0.6 : 1 }}
+          >
+            {loading ? "Looking up..." : "Lookup Student"}
+          </button>
+        </form>
+      )}
+
+      {step === "edit" && record && (
+        <form onSubmit={handleSave}>
+          {/* Read-only student number */}
+          <div style={s.field}>
+            <label style={s.label}>Student Number <span style={{ ...s.opt, background: "#fef3c7", color: "#92400e" }}>locked</span></label>
+            <input type="text" value={record.HesapKodu} disabled style={disabledInput} />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
+            {[
+              { key: "Unvan1",       label: "Full Name",      placeholder: "FIRST LAST" },
+              { key: "Bolum",        label: "Program",        placeholder: "Yazılım Mühendisliği" },
+              { key: "Fakulte",      label: "Faculty",        placeholder: "Mühendislik Fakültesi" },
+              { key: "EgitimYil",    label: "Academic Year",  placeholder: "2025" },
+              { key: "EgitimUcreti", label: "Tuition (USD)",  placeholder: "4500", type: "number" },
+            ].map(({ key, label, placeholder, type = "text" }) => (
+              <div key={key} style={s.field}>
+                <label style={s.label}>{label}</label>
+                <input
+                  type={type}
+                  value={editForm[key]}
+                  onChange={setField(key)}
+                  placeholder={placeholder}
+                  style={inputStyle}
+                  onFocus={e => { e.target.style.borderColor = "#6366f1"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"; }}
+                  onBlur={e => { e.target.style.borderColor = "#e5e7eb"; e.target.style.boxShadow = "none"; }}
+                />
+              </div>
+            ))}
+          </div>
+
+          {error   && <div style={{ ...s.errorBox,   marginTop: 10 }}><span style={s.alertIcon}>⚠</span> {error}</div>}
+          {success && <div style={{ ...s.successBox, marginTop: 10 }}><span style={s.alertIcon}>✓</span> {success}</div>}
+
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <button
+              type="button"
+              onClick={() => { setStep("lookup"); setRecord(null); setError(""); setSuccess(""); }}
+              style={{ ...s.genBtn, background: "#f3f4f6", color: "#374151", boxShadow: "none", flex: "0 0 auto", width: "auto", padding: "12px 20px" }}
+            >
+              ← Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{ ...s.genBtn, flex: 1, opacity: loading ? 0.6 : 1 }}
+            >
+              {loading ? "Saving..." : "💾 Save Changes"}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// ─── Route check: show admin dashboard if URL ends with /staff-admin ─────────
+function useIsAdminRoute() {
+  return window.location.pathname === "/staff-admin";
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3001";
 const LOCAL_API = "http://localhost:3001";
 
@@ -19,6 +199,23 @@ function fmt(n) {
 }
 
 export default function App() {
+  const isAdmin = useIsAdminRoute();
+  if (isAdmin) return (
+    <div style={s.page}>
+      <div style={s.blob1} /><div style={s.blob2} />
+      <div style={{ ...s.container, maxWidth: 540 }}>
+        <div style={{ ...s.header, marginBottom: "1.5rem" }}>
+          <div style={s.logoRow}>
+            <div style={s.logoBadge}><span style={s.logoIcon}>◈</span><span style={s.logoText}>Okan University</span></div>
+          </div>
+          <h1 style={{ ...s.title, fontSize: 26 }}>Staff Admin Panel</h1>
+          <p style={s.subtitle}>Edit student records in the ForNET database</p>
+        </div>
+        <AdminDashboard />
+      </div>
+    </div>
+  );
+
   const [form, setForm] = useState({
     firstName: "", lastName: "",
     date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })(),
