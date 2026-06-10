@@ -1,24 +1,77 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+
+// ─── Toast system ─────────────────────────────────────────────────────────────
+function Toast({ toasts, dismiss }) {
+  return (
+    <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
+      {toasts.map(t => (
+        <div
+          key={t.id}
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "12px 16px",
+            borderRadius: 12,
+            fontSize: 13, fontWeight: 500,
+            boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+            fontFamily: "'Inter','Segoe UI',sans-serif",
+            pointerEvents: "auto",
+            minWidth: 240, maxWidth: 340,
+            animation: "slideIn 0.2s ease",
+            ...(t.type === "success"
+              ? { background: "#f0fdf4", border: "1px solid #86efac", color: "#15803d" }
+              : { background: "#fef2f2", border: "1px solid #fca5a5", color: "#dc2626" }),
+          }}
+        >
+          <span style={{ fontSize: 16, flexShrink: 0 }}>{t.type === "success" ? "✓" : "✕"}</span>
+          <span style={{ flex: 1 }}>{t.message}</span>
+          <button
+            onClick={() => dismiss(t.id)}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "inherit", opacity: 0.5, padding: 0, lineHeight: 1, flexShrink: 0 }}
+          >✕</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function useToast() {
+  const [toasts, setToasts] = useState([]);
+  const show = useCallback((message, type = "success", duration = 4000) => {
+    const id = Date.now();
+    setToasts(ts => [...ts, { id, message, type }]);
+    setTimeout(() => setToasts(ts => ts.filter(t => t.id !== id)), duration);
+  }, []);
+  const dismiss = useCallback((id) => setToasts(ts => ts.filter(t => t.id !== id)), []);
+  return { toasts, show, dismiss };
+}
 
 // ─── Staff Admin Dashboard ────────────────────────────────────────────────────
 function AdminDashboard() {
+  const { toasts, show: showToast, dismiss } = useToast();
   const [step, setStep] = useState("lookup"); // "lookup" | "edit"
   const [password, setPassword] = useState("");
   const [studentNo, setStudentNo] = useState("");
   const [record, setRecord] = useState(null);
   const [editForm, setEditForm] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [lookupError, setLookupError] = useState("");
+
+  // Detect if the error is a network/offline error
+  function friendlyError(err) {
+    if (err.message === "Failed to fetch" || err.message.includes("NetworkError") || err.message.includes("net::")) {
+      return "Cannot reach the local backend. Make sure the office computer is on and the backend is running.";
+    }
+    return err.message;
+  }
 
   // Step 1: verify password + fetch student record
   const handleLookup = async (e) => {
     e.preventDefault();
-    setLoading(true); setError(""); setSuccess("");
+    setLookupLoading(true); setLookupError("");
     try {
-      const res = await fetch("http://localhost:3001/admin-lookup", {
+      const res = await localFetch("/admin-lookup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password, studentNo: studentNo.trim() }),
       });
       const data = await res.json();
@@ -33,144 +86,159 @@ function AdminDashboard() {
       });
       setStep("edit");
     } catch (err) {
-      setError(err.message);
+      setLookupError(friendlyError(err));
     } finally {
-      setLoading(false);
+      setLookupLoading(false);
     }
   };
 
   // Step 2: save all updated fields
   const handleSave = async (e) => {
     e.preventDefault();
-    setLoading(true); setError(""); setSuccess("");
+    setSaveLoading(true);
     try {
-      const res = await fetch("http://localhost:3001/admin-update-all", {
+      const res = await localFetch("/admin-update-all", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          password,
-          studentNo: record.HesapKodu,
-          ...editForm,
-        }),
+        body: JSON.stringify({ password, studentNo: record.HesapKodu, ...editForm }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Update failed");
-      setSuccess(`Saved. ${data.rowsAffected} row(s) updated.`);
+      showToast(`Saved — ${data.rowsAffected} row(s) updated in the database.`, "success");
     } catch (err) {
-      setError(err.message);
+      showToast(friendlyError(err), "error", 8000);
     } finally {
-      setLoading(false);
+      setSaveLoading(false);
     }
   };
 
-  const setField = (k) => (e) => {
-    setEditForm(f => ({ ...f, [k]: e.target.value }));
-    setSuccess(""); setError("");
-  };
+  const setField = (k) => (e) => setEditForm(f => ({ ...f, [k]: e.target.value }));
 
-  // ── Shared sub-styles ──
-  const inputStyle = { ...s.input, marginBottom: 0 };
+  const inputStyle  = { ...s.input, marginBottom: 0 };
   const disabledInput = { ...inputStyle, background: "#f3f4f6", color: "#9ca3af", cursor: "not-allowed" };
 
   return (
-    <div style={s.card}>
-      <div style={s.cardHeader}>
-        <span style={s.cardIcon}>🔐</span>
-        <span style={s.cardTitle}>Staff Admin — Edit Student Record</span>
-      </div>
+    <>
+      <Toast toasts={toasts} dismiss={dismiss} />
+      <div style={s.card}>
+        <div style={s.cardHeader}>
+          <span style={s.cardIcon}>🔐</span>
+          <span style={s.cardTitle}>Staff Admin — Edit Student Record</span>
+        </div>
 
-      {step === "lookup" && (
-        <form onSubmit={handleLookup}>
-          <div style={s.field}>
-            <label style={s.label}>Admin Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => { setPassword(e.target.value); setError(""); }}
-              placeholder="Enter admin password"
-              style={inputStyle}
-              required
-              onFocus={e => { e.target.style.borderColor = "#6366f1"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"; }}
-              onBlur={e => { e.target.style.borderColor = "#e5e7eb"; e.target.style.boxShadow = "none"; }}
-            />
-          </div>
-          <div style={{ ...s.field, marginTop: 10 }}>
-            <label style={s.label}>Student Number</label>
-            <input
-              type="text"
-              value={studentNo}
-              onChange={e => { setStudentNo(e.target.value); setError(""); }}
-              placeholder="e.g. 220218371"
-              style={inputStyle}
-              required
-              onFocus={e => { e.target.style.borderColor = "#6366f1"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"; }}
-              onBlur={e => { e.target.style.borderColor = "#e5e7eb"; e.target.style.boxShadow = "none"; }}
-            />
-          </div>
-          {error && <div style={{ ...s.errorBox, marginTop: 10 }}><span style={s.alertIcon}>⚠</span> {error}</div>}
-          <button
-            type="submit"
-            disabled={loading}
-            style={{ ...s.genBtn, marginTop: 14, opacity: loading ? 0.6 : 1 }}
-          >
-            {loading ? "Looking up..." : "Lookup Student"}
-          </button>
-        </form>
-      )}
-
-      {step === "edit" && record && (
-        <form onSubmit={handleSave}>
-          {/* Read-only student number */}
-          <div style={s.field}>
-            <label style={s.label}>Student Number <span style={{ ...s.opt, background: "#fef3c7", color: "#92400e" }}>locked</span></label>
-            <input type="text" value={record.HesapKodu} disabled style={disabledInput} />
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
-            {[
-              { key: "Unvan1",       label: "Full Name",      placeholder: "FIRST LAST" },
-              { key: "Bolum",        label: "Program",        placeholder: "Yazılım Mühendisliği" },
-              { key: "Fakulte",      label: "Faculty",        placeholder: "Mühendislik Fakültesi" },
-              { key: "EgitimYil",    label: "Academic Year",  placeholder: "2025" },
-              { key: "EgitimUcreti", label: "Tuition (USD)",  placeholder: "4500", type: "number" },
-            ].map(({ key, label, placeholder, type = "text" }) => (
-              <div key={key} style={s.field}>
-                <label style={s.label}>{label}</label>
-                <input
-                  type={type}
-                  value={editForm[key]}
-                  onChange={setField(key)}
-                  placeholder={placeholder}
-                  style={inputStyle}
-                  onFocus={e => { e.target.style.borderColor = "#6366f1"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"; }}
-                  onBlur={e => { e.target.style.borderColor = "#e5e7eb"; e.target.style.boxShadow = "none"; }}
-                />
+        {/* ── Step 1: Lookup ── */}
+        {step === "lookup" && (
+          <form onSubmit={handleLookup}>
+            <div style={s.field}>
+              <label style={s.label}>Admin Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => { setPassword(e.target.value); setLookupError(""); }}
+                placeholder="Enter admin password"
+                style={inputStyle}
+                required
+                onFocus={e => { e.target.style.borderColor = "#6366f1"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"; }}
+                onBlur={e => { e.target.style.borderColor = "#e5e7eb"; e.target.style.boxShadow = "none"; }}
+              />
+            </div>
+            <div style={{ ...s.field, marginTop: 10 }}>
+              <label style={s.label}>Student Number</label>
+              <input
+                type="text"
+                value={studentNo}
+                onChange={e => { setStudentNo(e.target.value); setLookupError(""); }}
+                placeholder="e.g. 220218371"
+                style={inputStyle}
+                required
+                onFocus={e => { e.target.style.borderColor = "#6366f1"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"; }}
+                onBlur={e => { e.target.style.borderColor = "#e5e7eb"; e.target.style.boxShadow = "none"; }}
+              />
+            </div>
+            {lookupError && (
+              <div style={{ ...s.errorBox, marginTop: 10 }}>
+                <span style={s.alertIcon}>⚠</span> {lookupError}
               </div>
-            ))}
-          </div>
-
-          {error   && <div style={{ ...s.errorBox,   marginTop: 10 }}><span style={s.alertIcon}>⚠</span> {error}</div>}
-          {success && <div style={{ ...s.successBox, marginTop: 10 }}><span style={s.alertIcon}>✓</span> {success}</div>}
-
-          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-            <button
-              type="button"
-              onClick={() => { setStep("lookup"); setRecord(null); setError(""); setSuccess(""); }}
-              style={{ ...s.genBtn, background: "#f3f4f6", color: "#374151", boxShadow: "none", flex: "0 0 auto", width: "auto", padding: "12px 20px" }}
-            >
-              ← Cancel
-            </button>
+            )}
             <button
               type="submit"
-              disabled={loading}
-              style={{ ...s.genBtn, flex: 1, opacity: loading ? 0.6 : 1 }}
+              disabled={lookupLoading}
+              style={{
+                ...s.genBtn, marginTop: 14,
+                background: lookupLoading ? "#9ca3af" : "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                cursor: lookupLoading ? "not-allowed" : "pointer",
+                transition: "background 0.2s",
+              }}
             >
-              {loading ? "Saving..." : "💾 Save Changes"}
+              <span style={s.genBtnInner}>
+                {lookupLoading && <span style={s.spinner} />}
+                {lookupLoading ? "Looking up..." : "Lookup Student"}
+              </span>
             </button>
-          </div>
-        </form>
-      )}
-    </div>
+          </form>
+        )}
+
+        {/* ── Step 2: Edit form ── */}
+        {step === "edit" && record && (
+          <form onSubmit={handleSave}>
+            <div style={s.field}>
+              <label style={s.label}>
+                Student Number{" "}
+                <span style={{ ...s.opt, background: "#fef3c7", color: "#92400e" }}>locked</span>
+              </label>
+              <input type="text" value={record.HesapKodu} disabled style={disabledInput} />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
+              {[
+                { key: "Unvan1",       label: "Full Name",     placeholder: "FIRST LAST" },
+                { key: "Bolum",        label: "Program",       placeholder: "Yazılım Mühendisliği" },
+                { key: "Fakulte",      label: "Faculty",       placeholder: "Mühendislik Fakültesi" },
+                { key: "EgitimYil",    label: "Academic Year", placeholder: "2025" },
+                { key: "EgitimUcreti", label: "Tuition (USD)", placeholder: "4500", type: "number" },
+              ].map(({ key, label, placeholder, type = "text" }) => (
+                <div key={key} style={s.field}>
+                  <label style={s.label}>{label}</label>
+                  <input
+                    type={type}
+                    value={editForm[key]}
+                    onChange={setField(key)}
+                    placeholder={placeholder}
+                    style={inputStyle}
+                    onFocus={e => { e.target.style.borderColor = "#6366f1"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"; }}
+                    onBlur={e => { e.target.style.borderColor = "#e5e7eb"; e.target.style.boxShadow = "none"; }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+              <button
+                type="button"
+                onClick={() => { setStep("lookup"); setRecord(null); setLookupError(""); }}
+                style={{ ...s.genBtn, background: "#f3f4f6", color: "#374151", boxShadow: "none", flex: "0 0 auto", width: "auto", padding: "12px 20px" }}
+              >
+                ← Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saveLoading}
+                style={{
+                  ...s.genBtn, flex: 1,
+                  background: saveLoading ? "#9ca3af" : "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                  cursor: saveLoading ? "not-allowed" : "pointer",
+                  transition: "background 0.2s",
+                }}
+              >
+                <span style={s.genBtnInner}>
+                  {saveLoading && <span style={s.spinner} />}
+                  {saveLoading ? "Saving..." : "💾 Save Changes"}
+                </span>
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -180,8 +248,21 @@ function useIsAdminRoute() {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3001";
-const LOCAL_API = "http://localhost:3001";
+const API_URL   = process.env.REACT_APP_API_URL   || "http://localhost:3001";
+const LOCAL_API  = process.env.REACT_APP_LOCAL_API  || "http://localhost:3001";
+const API_KEY    = process.env.REACT_APP_API_KEY    || "";
+
+// All calls to the local backend go through this — attaches the API key header
+function localFetch(path, options = {}) {
+  return fetch(`${LOCAL_API}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": API_KEY,
+      ...(options.headers || {}),
+    },
+  });
+}
 
 const DEPTS = [
   { name: "Medicine", typical: 19475 },
@@ -198,10 +279,16 @@ function fmt(n) {
   return parseFloat(n).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+const GLOBAL_STYLES = `
+  @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes spin    { to { transform: rotate(360deg); } }
+`;
+
 export default function App() {
   const isAdmin = useIsAdminRoute();
   if (isAdmin) return (
     <div style={s.page}>
+      <style>{GLOBAL_STYLES}</style>
       <div style={s.blob1} /><div style={s.blob2} />
       <div style={{ ...s.container, maxWidth: 540 }}>
         <div style={{ ...s.header, marginBottom: "1.5rem" }}>
@@ -247,7 +334,7 @@ export default function App() {
     setStudentLookupLoading(true);
     setStudentLookupError("");
     try {
-      const res = await fetch(`${LOCAL_API}/student/${studentNo.trim()}`);
+      const res = await localFetch(`/student/${studentNo.trim()}`);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || "Student not found");
@@ -324,6 +411,7 @@ export default function App() {
 
   return (
     <div style={s.page}>
+      <style>{GLOBAL_STYLES}</style>
       {/* Background blobs */}
       <div style={s.blob1} />
       <div style={s.blob2} />

@@ -1,3 +1,5 @@
+require("dotenv").config({ path: require("path").join(__dirname, ".env") });
+
 const express = require("express");
 const cors = require("cors");
 const sql = require("mssql");
@@ -6,18 +8,56 @@ const {
   AlignmentType, WidthType, BorderStyle, ShadingType, VerticalAlign,
 } = require("docx");
 
+const rateLimit = require("express-rate-limit");
+
 const app = express();
-app.use(cors());
+
+// ── CORS — only allow the invoice frontend and local dev ───────────────────
+app.use(cors({
+  origin: [
+    "https://okan.invoice.baikgroup.com",
+    "http://localhost:3000",
+    "http://localhost:3001",
+  ],
+}));
 app.use(express.json());
 
-// ── DB config ──────────────────────────────────────────────────────────────
+// ── Rate limiting — 60 requests per IP per minute across all endpoints ─────
+app.use(rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests. Try again in a minute." },
+}));
+
+// ── API key guard — all sensitive endpoints require X-API-Key header ────────
+function requireApiKey(req, res, next) {
+  if (req.headers["x-api-key"] !== process.env.API_KEY) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
+}
+
+// ── DB config — all values come from the .env file on this machine ──────────
+// Never hardcode credentials here. See .env.example for required keys.
 const dbConfig = {
-  server: "192.168.5.9",
-  user: "SA",
-  password: "Wsad6aeqKu23s",
-  database: "ForNetOkan",
+  server:   process.env.DB_SERVER,
+  port:     parseInt(process.env.DB_PORT || "1433", 10),
+  user:     process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
   options: { trustServerCertificate: true, encrypt: false },
 };
+
+// Fail fast at startup if any required env var is missing
+const REQUIRED_ENV = ["DB_SERVER", "DB_USER", "DB_PASSWORD", "DB_NAME", "ADMIN_PASS", "API_KEY"];
+const missing = REQUIRED_ENV.filter(k => !process.env[k]);
+if (missing.length) {
+  console.error(`\n[FATAL] Missing required environment variables: ${missing.join(", ")}`);
+  console.error("Create a .env file in local-backend/ — see .env.example for the required keys.\n");
+  process.exit(1);
+}
 
 let pool;
 async function getPool() {
@@ -25,12 +65,11 @@ async function getPool() {
   return pool;
 }
 
-// ── Admin password ─────────────────────────────────────────────────────────
-// TODO: Change this to your actual admin password before using
-const ADMIN_PASS = "MySecretPassword123";
+// ── Admin password — loaded from .env, never hardcoded ────────────────────
+const ADMIN_PASS = process.env.ADMIN_PASS;
 
 // ── Admin: lookup student (returns full raw row) ───────────────────────────
-app.post("/admin-lookup", async (req, res) => {
+app.post("/admin-lookup", requireApiKey, async (req, res) => {
   const { password, studentNo } = req.body;
   if (!password || password !== ADMIN_PASS) {
     return res.status(401).json({ error: "Unauthorized: wrong password" });
@@ -56,7 +95,7 @@ app.post("/admin-lookup", async (req, res) => {
 });
 
 // ── Admin: update all editable fields for a student ────────────────────────
-app.post("/admin-update-all", async (req, res) => {
+app.post("/admin-update-all", requireApiKey, async (req, res) => {
   const { password, studentNo, Unvan1, Bolum, Fakulte, EgitimYil, EgitimUcreti } = req.body;
 
   if (!password || password !== ADMIN_PASS) {
@@ -96,7 +135,7 @@ app.post("/admin-update-all", async (req, res) => {
 });
 
 // ── Student lookup ─────────────────────────────────────────────────────────
-app.get("/student/:id", async (req, res) => {
+app.get("/student/:id", requireApiKey, async (req, res) => {
   try {
     const db = await getPool();
 
@@ -130,7 +169,7 @@ app.get("/student/:id", async (req, res) => {
 });
 
 // ── Debug: check user KisiID and TEMP table row count ─────────────────────
-app.get("/debug", async (req, res) => {
+app.get("/debug", requireApiKey, async (req, res) => {
   try {
     const db = await getPool();
 
@@ -156,7 +195,7 @@ app.get("/debug", async (req, res) => {
 });
 
 // ── Schema discovery (use once to find correct table/column names) ──────────
-app.get("/schema", async (req, res) => {
+app.get("/schema", requireApiKey, async (req, res) => {
   try {
     const db = await getPool();
     const tables = await db.request().query(`
@@ -170,7 +209,7 @@ app.get("/schema", async (req, res) => {
   }
 });
 
-app.get("/schema/:table", async (req, res) => {
+app.get("/schema/:table", requireApiKey, async (req, res) => {
   try {
     const db = await getPool();
     const cols = await db.request()
