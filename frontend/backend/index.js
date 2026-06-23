@@ -166,7 +166,8 @@ app.post("/generate", async (req, res) => {
     const doc = buildDoc(data);
     const buffer = await Packer.toBuffer(doc);
     const filename = `invoice_${data.firstName}_${data.lastName}_${(data.acYear || "2024-2025").replace("-", "_")}${data.invNo ? "_" + data.invNo : ""}.docx`;
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    const asciiName = filename.normalize("NFKD").replace(/[^\x20-\x7E]/g, "");
+    res.setHeader("Content-Disposition", `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     res.send(buffer);
   } catch (err) {
