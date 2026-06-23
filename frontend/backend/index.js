@@ -20,13 +20,16 @@ function sp(n) {
   return new Paragraph({ children: [new TextRun("")], spacing: { after: n } });
 }
 
-function buildDoc({ firstName, lastName, date, acYear, invAmount, totalAmount, program, invNo, descType, customDesc }) {
+function buildDoc({ firstName, lastName, date, acYear, invAmount, totalAmount, program, invNo, descType, customDesc, feeType }) {
   const fullName = `${firstName} ${lastName}`;
   const acYearStr = acYear || "2024-2025";
   const d = new Date(date);
   const dateStr = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
   const invAmt = fmtAmt(invAmount);
   const totAmt = totalAmount ? fmtAmt(totalAmount) : null;
+
+  const feeLabels = { tuition: "tuition fee", dormitory: "dormitory fee", summer: "summer course fee" };
+  const feeText = feeLabels[feeType] || "tuition fee";
 
   let descText;
   if (customDesc && customDesc.trim()) {
@@ -113,7 +116,7 @@ function buildDoc({ firstName, lastName, date, acYear, invAmount, totalAmount, p
   if (totAmt) {
     paymentLines.push(new Paragraph({ spacing: { after: 80 }, children: [
       new TextRun({ text: fullName, bold: true, size: 22 }),
-      new TextRun({ text: "'s tuition fee is ", size: 22 }),
+      new TextRun({ text: `'s ${feeText} is `, size: 22 }),
       new TextRun({ text: `${totAmt} USD`, size: 22, bold: true }),
       new TextRun({ text: ` for ${acYearStr}.`, size: 22 }),
     ]}));
@@ -160,6 +163,7 @@ app.post("/generate", async (req, res) => {
   try {
     const data = req.body;
     data.descType = data.descType || "registration";
+    data.feeType = data.feeType || "tuition";
     if (!data.firstName || !data.lastName || !data.invAmount || !data.program) {
       return res.status(400).json({ error: "Missing required fields" });
     }

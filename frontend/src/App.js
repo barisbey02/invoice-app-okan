@@ -312,6 +312,7 @@ export default function App() {
   });
   const [selectedDept, setSelectedDept] = useState("");
   const [descType, setDescType] = useState("registration");
+  const [feeType, setFeeType] = useState("tuition");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -387,6 +388,7 @@ export default function App() {
           program,
           invNo: form.invNo || null,
           descType,
+          feeType,
           customDesc: form.customDesc || null,
         }),
       });
@@ -547,6 +549,29 @@ export default function App() {
             placeholder="e.g. 2025-2026 exchange program fee..."
             optional
           />
+        </div>
+
+        {/* Payment Terms Fee Type */}
+        <div style={s.card}>
+          <div style={s.cardHeader}>
+            <span style={s.cardIcon}>💳</span>
+            <span style={s.cardTitle}>Payment Terms Fee Type</span>
+          </div>
+          <div style={s.deptGrid}>
+            {[
+              { key: "tuition", label: "Tuition fee" },
+              { key: "dormitory", label: "Dormitory fee" },
+              { key: "summer", label: "Summer course fee" },
+            ].map((d) => (
+              <button
+                key={d.key}
+                style={{ ...s.deptBtn, ...(feeType === d.key ? s.deptBtnActive : {}) }}
+                onClick={() => setFeeType(d.key)}
+              >
+                <div style={{ ...s.deptName, ...(feeType === d.key ? { color: "#fff" } : {}) }}>{d.label}</div>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Program */}
