@@ -39,104 +39,116 @@ function buildDoc({ firstName, lastName, date, acYear, invAmount, totalAmount, p
     descText = `${program} program at İstanbul Okan University ${acYearStr} registration fee`;
   }
 
-  const thin = { style: BorderStyle.SINGLE, size: 4, color: "CCCCCC" };
-  const none = { style: BorderStyle.NIL, size: 0, color: "FFFFFF" };
-  const cb = { top: thin, bottom: thin, left: thin, right: thin };
-  const nb = { top: none, bottom: none, left: none, right: none };
+  // ---- styling extracted from reference/amna.docx (see DESIGN_SPEC.md) ----
+  const HEAD_FONT = "Tahoma";          // letterhead + signatory
+  const ITEM_SHADE = "F8F9FA";         // faint tint on the description cell
+  const line = { style: BorderStyle.SINGLE, size: 4, color: "000000" }; // 0.5pt black
+  const noLine = { style: BorderStyle.NIL, size: 0, color: "FFFFFF" };
+  const fullB = { top: line, bottom: line, left: line, right: line };
+  const totalLabelB = { top: line, bottom: noLine, left: noLine, right: line }; // open TOTAL label
+  const noB = { top: noLine, bottom: noLine, left: noLine, right: noLine };
+  const cellMargins = { top: 80, bottom: 80, left: 100, right: 100 };
 
+  // ---- letterhead (Tahoma 11pt, no logo, right column positioned via borderless table) ----
+  const lh = (text) => new Paragraph({ children: [new TextRun({ text, font: HEAD_FONT, size: 22 })] });
   const rightChildren = [
-    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "PROFORMA INVOICE", bold: true, size: 28 })] }),
-    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `DATE: ${dateStr}`, size: 18 })] }),
+    new Paragraph({ children: [new TextRun({ text: "PROFORMA INVOICE", font: HEAD_FONT, size: 28, bold: true })] }),
+    lh(`DATE: ${dateStr}`),
   ];
-  if (invNo) {
-    rightChildren.push(new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `NO: ${invNo}`, size: 18 })] }));
-  }
+  if (invNo) rightChildren.push(lh(`NO: ${invNo}`));
 
   const headerTable = new Table({
-    width: { size: 9360, type: WidthType.DXA },
-    columnWidths: [5400, 3960],
-    borders: { top: none, bottom: none, left: none, right: none, insideH: none, insideV: none },
+    width: { size: 9225, type: WidthType.DXA },
+    columnWidths: [6160, 3065],
+    borders: { top: noLine, bottom: noLine, left: noLine, right: noLine, insideH: noLine, insideV: noLine },
     rows: [new TableRow({ children: [
       new TableCell({
-        borders: nb, width: { size: 5400, type: WidthType.DXA },
+        borders: noB, width: { size: 6160, type: WidthType.DXA },
         margins: { top: 0, bottom: 0, left: 0, right: 120 },
+        verticalAlign: VerticalAlign.TOP,
         children: [
-          new Paragraph({ children: [new TextRun({ text: "İstanbul Okan Üniversitesi Tuzla Kampüsü", bold: true, size: 20 })] }),
-          new Paragraph({ children: [new TextRun({ text: "Tuzla Kampusu, Akfırat- Tuzla", size: 18 })] }),
-          new Paragraph({ children: [new TextRun({ text: "34959 İstanbul/Turkey", size: 18 })] }),
-          new Paragraph({ children: [new TextRun({ text: "Tel: +90 216 677 1630", size: 18 })] }),
-          new Paragraph({ children: [new TextRun({ text: "www.okan.edu.tr", size: 18, color: "1155CC" })] }),
+          lh("İstanbul Okan Üniversitesi Tuzla Kampüsü"),
+          lh("Tuzla Kampusu, Akfırat- Tuzla"),
+          lh("34959 İstanbul/Turkey"),
+          lh("Tel: +90 216 677 1630"),
+          lh(""),
+          lh("www.okan.edu.tr"),
         ],
       }),
       new TableCell({
-        borders: nb, width: { size: 3960, type: WidthType.DXA },
+        borders: noB, width: { size: 3065, type: WidthType.DXA },
         margins: { top: 0, bottom: 0, left: 120, right: 0 },
         verticalAlign: VerticalAlign.TOP,
         children: rightChildren,
       }),
-    ]})]
+    ]})],
   });
+
+  // ---- line-item table (12pt, plain white header, black borders, true right-aligned amounts) ----
+  const tblTxt = (text) => new TextRun({ text, size: 24 });
 
   const invoiceTable = new Table({
-    width: { size: 9360, type: WidthType.DXA },
-    columnWidths: [7200, 2160],
+    width: { size: 9225, type: WidthType.DXA },
+    columnWidths: [6285, 2940],
     rows: [
       new TableRow({ children: [
-        new TableCell({ borders: cb, width: { size: 7200, type: WidthType.DXA }, shading: { fill: "1F3864", type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: "DESCRIPTION", bold: true, size: 20, color: "FFFFFF" })] })] }),
-        new TableCell({ borders: cb, width: { size: 2160, type: WidthType.DXA }, shading: { fill: "1F3864", type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "AMOUNT", bold: true, size: 20, color: "FFFFFF" })] })] }),
+        new TableCell({ borders: fullB, width: { size: 6285, type: WidthType.DXA }, margins: cellMargins, verticalAlign: VerticalAlign.CENTER, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [tblTxt("DESCRIPTION")] })] }),
+        new TableCell({ borders: fullB, width: { size: 2940, type: WidthType.DXA }, margins: cellMargins, verticalAlign: VerticalAlign.CENTER, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [tblTxt("AMOUNT")] })] }),
       ]}),
       new TableRow({ children: [
-        new TableCell({ borders: cb, width: { size: 7200, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: descText, size: 20 })] })] }),
-        new TableCell({ borders: cb, width: { size: 2160, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${invAmt} USD`, size: 20 })] })] }),
+        new TableCell({ borders: fullB, width: { size: 6285, type: WidthType.DXA }, shading: { fill: ITEM_SHADE, type: ShadingType.CLEAR }, margins: cellMargins, children: [new Paragraph({ children: [tblTxt(descText)] })] }),
+        new TableCell({ borders: fullB, width: { size: 2940, type: WidthType.DXA }, margins: cellMargins, verticalAlign: VerticalAlign.TOP, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [tblTxt(`${invAmt} USD`)] })] }),
       ]}),
       new TableRow({ children: [
-        new TableCell({ borders: cb, width: { size: 7200, type: WidthType.DXA }, shading: { fill: "F2F2F2", type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: "TOTAL", bold: true, size: 20 })] })] }),
-        new TableCell({ borders: cb, width: { size: 2160, type: WidthType.DXA }, shading: { fill: "F2F2F2", type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${totAmt || invAmt} USD`, bold: true, size: 20 })] })] }),
+        new TableCell({ borders: totalLabelB, width: { size: 6285, type: WidthType.DXA }, margins: cellMargins, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [tblTxt("TOTAL")] })] }),
+        new TableCell({ borders: fullB, width: { size: 2940, type: WidthType.DXA }, margins: cellMargins, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [tblTxt(`${totAmt || invAmt} USD`)] })] }),
       ]}),
-    ]
+    ],
   });
 
+  // ---- payment terms (label 12pt; sentences 11pt, student name bold) ----
   const paymentLines = [
-    new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: "PAYMENT TERMS:", bold: true, size: 20 })] }),
+    new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: "PAYMENT TERMS:", size: 24, bold: true })] }),
   ];
   if (totAmt) {
     paymentLines.push(new Paragraph({ spacing: { after: 80 }, children: [
-      new TextRun({ text: fullName, bold: true, size: 20 }),
-      new TextRun({ text: "'s tuition fee is ", size: 20 }),
-      new TextRun({ text: `${totAmt} USD`, bold: true, size: 20 }),
-      new TextRun({ text: ` for ${acYearStr}.`, size: 20 }),
+      new TextRun({ text: fullName, bold: true, size: 22 }),
+      new TextRun({ text: "'s tuition fee is ", size: 22 }),
+      new TextRun({ text: `${totAmt} USD`, size: 22, bold: true }),
+      new TextRun({ text: ` for ${acYearStr}.`, size: 22 }),
     ]}));
   }
-  paymentLines.push(new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: "This amount should be paid at once to the University's Bank Account information below.", size: 20 })] }));
+  paymentLines.push(new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: "This amount should be paid at once to the University's Bank Account information below.", size: 22 })] }));
 
-  const bankTable = new Table({
-    width: { size: 9360, type: WidthType.DXA },
-    columnWidths: [2800, 6560],
-    rows: [
-      ["BENEFICIARY NAME", "İSTANBUL OKAN UNİVERSİTESİ"],
-      ["NAME OF BANK", "FIBA BANKA"],
-      ["BRANCH", "MERKEZ ISTANBUL BRANCH"],
-      ["SWIFT", "FBHLTRISXXX"],
-      ["BANK NO", "103"],
-      ["IBAN", "TR73 0010 3000 0000 0029 9568 81"],
-    ].map(([label, val]) => new TableRow({ children: [
-      new TableCell({ borders: cb, width: { size: 2800, type: WidthType.DXA }, shading: { fill: "F2F2F2", type: ShadingType.CLEAR }, margins: { top: 60, bottom: 60, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, size: 18 })] })] }),
-      new TableCell({ borders: cb, width: { size: 6560, type: WidthType.DXA }, margins: { top: 60, bottom: 60, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })] })] }),
-    ]}))
-  });
+  // ---- bank information (plain Calibri 11pt paragraphs, not a table) ----
+  const bankRows = [
+    ["BENEFICIARY NAME", "İSTANBUL OKAN UNİVERSİTESİ"],
+    ["NAME OF BANK", "FIBA BANKA"],
+    ["BRANCH", "MERKEZ ISTANBUL BRANCH"],
+    null,
+    ["SWIFT", "FBHLTRISXXX"],
+    ["BANK NO", "103"],
+    ["IBAN", "TR73 0010 3000 0000 0029 9568 81"],
+  ];
+  const bankLines = bankRows.map((r) =>
+    new Paragraph({ spacing: { after: 40 }, children: r
+      ? [new TextRun({ text: `${r[0]}: `, size: 22, bold: true }), new TextRun({ text: r[1], size: 22 })]
+      : [new TextRun({ text: "", size: 22 })] })
+  );
 
   return new Document({
+    styles: { default: { document: { run: { font: "Calibri", size: 22 } } } },
     sections: [{
       properties: {
-        page: { size: { width: 12240, height: 15840 }, margin: { top: 1800, right: 1080, bottom: 1080, left: 1080 } }
+        page: { size: { width: 11906, height: 16838 }, margin: { top: 2880, right: 1417, bottom: 2400, left: 993 } }
       },
       children: [
         headerTable, sp(240), invoiceTable, sp(240),
-        ...paymentLines, sp(200),
-        new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: "BANK INFORMATION:", bold: true, size: 20 })] }),
-        bankTable, sp(3200),
-        new Paragraph({ children: [new TextRun({ text: "Elif Tuğçe Dağ", bold: true, size: 20 })] }),
-        new Paragraph({ children: [new TextRun({ text: "Student Operations Specialist", size: 18 })] }),
+        ...paymentLines, sp(160),
+        new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: "BANK INFORMATION:", bold: true, size: 24 })] }),
+        ...bankLines, sp(800),
+        new Paragraph({ children: [new TextRun({ text: "Elif Tuğçe Dağ", font: HEAD_FONT, size: 22 })] }),
+        new Paragraph({ children: [new TextRun({ text: "Student Operations Specialist", font: HEAD_FONT, size: 22 })] }),
       ]
     }]
   });
@@ -154,7 +166,8 @@ app.post("/generate", async (req, res) => {
     const doc = buildDoc(data);
     const buffer = await Packer.toBuffer(doc);
     const filename = `invoice_${data.firstName}_${data.lastName}_${(data.acYear || "2024-2025").replace("-", "_")}${data.invNo ? "_" + data.invNo : ""}.docx`;
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    const asciiName = filename.normalize("NFKD").replace(/[^\x20-\x7E]/g, "");
+    res.setHeader("Content-Disposition", `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     res.send(buffer);
   } catch (err) {
