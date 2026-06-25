@@ -226,6 +226,17 @@ app.get("/schema/:table", requireApiKey, async (req, res) => {
 // ── Invoice generation — buildDoc/fmtAmt/sp live in the shared module ──────
 // (../frontend/backend/invoice-doc.js, imported at the top of this file).
 
+// ── List all databases on the SQL Server instance ─────────────────────────
+app.get("/databases", requireApiKey, async (req, res) => {
+  try {
+    const db = await getPool();
+    const result = await db.request().query(`SELECT name, database_id, create_date FROM sys.databases ORDER BY name`);
+    res.json(result.recordset);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Env diagnostic — no auth required, safe (values never exposed) ──────────
 app.get("/debug-env", (req, res) => {
   const vars = ["DB_SERVER", "DB_USER", "DB_PASSWORD", "DB_NAME", "ADMIN_PASS", "API_KEY"];
