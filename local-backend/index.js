@@ -65,12 +65,12 @@ async function getPool() {
 }
 
 // ── Admin password — loaded from .env, never hardcoded ────────────────────
-const ADMIN_PASS = process.env.ADMIN_PASS;
+const ADMIN_PASS = (process.env.ADMIN_PASS || "").trim();
 
 // ── Admin: lookup student (returns full raw row) ───────────────────────────
 app.post("/admin-lookup", requireApiKey, async (req, res) => {
   const { password, studentNo } = req.body;
-  if (!password || password !== ADMIN_PASS) {
+  if (!password || password.trim() !== ADMIN_PASS) {
     return res.status(401).json({ error: "Unauthorized: wrong password" });
   }
   if (!studentNo) {
@@ -97,7 +97,7 @@ app.post("/admin-lookup", requireApiKey, async (req, res) => {
 app.post("/admin-update-all", requireApiKey, async (req, res) => {
   const { password, studentNo, Unvan1, Bolum, Fakulte, EgitimYil, EgitimUcreti } = req.body;
 
-  if (!password || password !== ADMIN_PASS) {
+  if (!password || password.trim() !== ADMIN_PASS) {
     return res.status(401).json({ error: "Unauthorized: wrong password" });
   }
   if (!studentNo) {
@@ -225,6 +225,18 @@ app.get("/schema/:table", requireApiKey, async (req, res) => {
 
 // ── Invoice generation — buildDoc/fmtAmt/sp live in the shared module ──────
 // (../frontend/backend/invoice-doc.js, imported at the top of this file).
+
+// ── Env diagnostic — no auth required, safe (values never exposed) ──────────
+app.get("/debug-env", (req, res) => {
+  const vars = ["DB_SERVER", "DB_USER", "DB_PASSWORD", "DB_NAME", "ADMIN_PASS", "API_KEY"];
+  res.json({
+    __dirname,
+    cwd: process.cwd(),
+    env: Object.fromEntries(
+      vars.map(k => [k, process.env[k] ? `set (${process.env[k].trim().length} chars)` : "MISSING"])
+    ),
+  });
+});
 
 app.get("/health", (req, res) => res.json({ ok: true }));
 
