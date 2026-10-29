@@ -237,8 +237,8 @@ app.get("/databases", requireApiKey, async (req, res) => {
   }
 });
 
-// ── Env diagnostic — no auth required, safe (values never exposed) ──────────
-app.get("/debug-env", (req, res) => {
+// ── Env diagnostic — requires API key (values never exposed) ────────────────
+app.get("/debug-env", requireApiKey, (req, res) => {
   const vars = ["DB_SERVER", "DB_USER", "DB_PASSWORD", "DB_NAME", "ADMIN_PASS", "API_KEY"];
   res.json({
     __dirname,
